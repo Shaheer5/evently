@@ -6,7 +6,7 @@ import { clerkClient } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
+  // You can find this in the Clerk Dashboard -> Webhooks -> choose the webhook
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
@@ -49,16 +49,13 @@ export async function POST(req: Request) {
     });
   }
 
-  // Do something with the payload
-  // For this guide, you simply log the payload to the console
+  // Get the ID and type
   const { id } = evt.data;
   const eventType = evt.type;
-  console.log(`Webhook with and ID of ${id} and type of ${eventType}`);
-  console.log("Webhook body:", body);
 
-  // create new user in server when the user is created in clerk
   if (eventType === "user.created") {
     const { id, email_addresses, image_url, first_name, last_name, username } = evt.data;
+
     const user = {
       clerkId: id,
       email: email_addresses[0].email_address,
@@ -67,7 +64,9 @@ export async function POST(req: Request) {
       lastName: last_name,
       photo: image_url,
     };
+
     const newUser = await createUser(user);
+
     if (newUser) {
       await clerkClient.users.updateUserMetadata(id, {
         publicMetadata: {
@@ -79,24 +78,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "OK", user: newUser });
   }
 
-  // update user in server after the user is created/exists in server/clerk
   if (eventType === "user.updated") {
     const { id, image_url, first_name, last_name, username } = evt.data;
+
     const user = {
-      username: username!,
       firstName: first_name,
       lastName: last_name,
+      username: username!,
       photo: image_url,
     };
+
     const updatedUser = await updateUser(id, user);
+
     return NextResponse.json({ message: "OK", user: updatedUser });
   }
 
-  // delete user in server after the user is created/exists in server/clerk
   if (eventType === "user.deleted") {
     const { id } = evt.data;
+
     const deletedUser = await deleteUser(id!);
+
     return NextResponse.json({ message: "OK", user: deletedUser });
   }
+
   return new Response("", { status: 200 });
 }
